@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)">
+<title>Wikirace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Young+Serif&display=swap">
+<style>
+/* Layout: one 720px column; fixed bottom bar (tabs on home, tools in a race); sticky race header. */
+:root{
+  --paper:#f3f5f8; --card:#ffffff; --ink:#13161b; --muted:#5b6570; --line:#dbe0e7;
+  --link:#2853c4; --flag:#f2b72c; --flag-ink:#3a2a00; --go:#178a57; --stop:#c93c3c;
+  --hit-cur:#ff9f1c; --imgbg:transparent;
+  --f-ui:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-read:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --f-display:"Young Serif",Georgia,serif;
+  --r:12px; --bar:64px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#0e1116; --card:#171b22; --ink:#e7eaee; --muted:#98a2ae; --line:#29303a;
+    --link:#82a6ff; --flag:#f5c451; --flag-ink:#2b1f00; --go:#3fcf8e; --stop:#ff7070;
+    --hit-cur:#c76a00; --imgbg:#f3f3f3;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:120px}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--f-ui);
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:calc(var(--bar) + env(safe-area-inset-bottom,0px) + 16px)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--paper);z-index:30}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--link);outline-offset:2px}
+[hidden]{display:none!important}
+.wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* ---------- shared bits ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 18px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-weight:700}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.flag{background:var(--flag);color:var(--flag-ink);border-color:var(--flag)}
+.btn.danger{color:var(--stop);border-color:var(--stop)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5}
+.ico{width:22px;height:22px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.muted{color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.pill.won{background:var(--flag);color:var(--flag-ink);border-color:var(--flag)}
+.pill.done{color:var(--go);border-color:var(--go)}
+.pill.quit{color:var(--stop);border-color:var(--stop)}
+.pill.live{color:var(--link);border-color:var(--link)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--bar) + env(safe-area-inset-bottom,0px) + 20px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:999px;font-weight:700;z-index:80;max-width:90vw;text-align:center}
+.empty{padding:28px 18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
+.err{color:var(--stop);font-weight:700}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- top / home ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:16px 8px}
+.logo{font-family:var(--f-display);font-size:28px;line-height:1;letter-spacing:-.01em;margin:0}
+.logo span{display:inline-block;background:var(--flag);color:var(--flag-ink);padding:2px 7px 4px;border-radius:6px;margin-left:2px;transform:rotate(-3deg)}
+.me{display:flex;gap:8px;align-items:center}
+.chipbtn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-weight:700;font-size:14px;max-width:160px}
+.chipbtn .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+h2.sec{font-family:var(--f-display);font-weight:400;font-size:22px;margin:22px 0 10px;text-wrap:balance}
+.stack{display:flex;flex-direction:column;gap:12px}
+
+.round{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
+.route{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.route .pg{min-width:0;font-family:var(--f-display);font-size:18px;line-height:1.2;overflow-wrap:anywhere}
+.route .pg.to{text-align:right}
+.route .arrow{color:var(--muted)}
+.route small{display:block;font-family:var(--f-ui);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px}
+.racers{display:flex;flex-direction:column;gap:6px}
+.racer{display:flex;align-items:center;gap:8px;font-size:15px}
+.racer .nm{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.racer .sp{flex:1}
+.meta{font-size:13px;color:var(--muted)}
+
+.trail{display:flex;flex-wrap:wrap;gap:4px 2px;align-items:center;font-size:13px;line-height:1.3}
+.trail .st{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:3px 7px;overflow-wrap:anywhere}
+.trail .st.end{background:var(--flag);border-color:var(--flag);color:var(--flag-ink);font-weight:700}
+.trail .st.back{border-style:dashed}
+.trail .sep{color:var(--muted);padding:0 2px}
+.hiddentrail{font-size:13px;color:var(--muted);font-style:italic}
+
+table.lb{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;font-variant-numeric:tabular-nums}
+.lb th,.lb td{padding:12px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:15px}
+.lb th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lb th:first-child,.lb td:first-child{text-align:left}
+.lb tr:last-child td{border-bottom:0}
+.lb .who{display:flex;align-items:center;gap:8px;font-weight:700}
+.lb .rank{font-family:var(--f-display);width:20px;color:var(--muted)}
+.lb tr.lead .rank{color:var(--ink)}
+.tblwrap{overflow-x:auto;border-radius:var(--r)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.stat b{display:block;font-family:var(--f-display);font-weight:400;font-size:22px}
+
+/* bottom bars */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--card);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.bar .in{max-width:720px;margin:0 auto;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;height:var(--bar)}
+.bar button{border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700;color:var(--muted)}
+.bar button[aria-current="true"],.bar button.on{color:var(--ink)}
+.bar button:disabled{opacity:.4}
+
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgba(10,12,16,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:720px;border-radius:18px 18px 0 0;max-height:88vh;overflow:auto;-webkit-overflow-scrolling:touch;
+  padding:18px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.sheet h3{font-family:var(--f-display);font-weight:400;font-size:22px;margin:0}
+.sheethead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.x{border:0;background:none;width:44px;height:44px;display:grid;place-items:center;border-radius:50%}
+.field{display:flex;flex-direction:column;gap:6px;position:relative}
+.inrow{display:flex;gap:8px}
+.inrow input{flex:1;min-width:0}
+input.txt{min-height:48px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--paper);font-size:17px}
+.iconbtn{width:48px;height:48px;border-radius:10px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;flex:none}
+.sugg{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.sugg button{border:0;border-bottom:1px solid var(--line);background:none;text-align:left;padding:12px;min-height:44px}
+.sugg button:last-child{border-bottom:0}
+.preview{display:flex;gap:12px;align-items:flex-start}
+.preview img{width:84px;height:84px;object-fit:cover;border-radius:8px;flex:none;background:var(--imgbg)}
+.preview p{margin:0;font-family:var(--f-read);font-size:15px;line-height:1.5}
+
+/* gate */
+.gate{min-height:80vh;display:flex;flex-direction:column;justify-content:center;gap:18px;padding-block:24px}
+.gate .logo{font-size:44px}
+.gate p{margin:0;font-size:17px;max-width:34ch}
+.who-list{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ---------- race ---------- */
+.raceHead{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--card);border-bottom:1px solid var(--line)}
+.raceHead .in{max-width:720px;margin:0 auto;padding:8px max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px}
+.rh1{display:flex;align-items:center;gap:8px}
+.target{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:0;background:var(--flag);color:var(--flag-ink);border-radius:10px;padding:6px 10px;text-align:left;min-height:44px}
+.target .t{font-family:var(--f-display);font-size:16px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.target small{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;opacity:.8}
+.target > div{min-width:0}
+.score{display:flex;flex-direction:column;align-items:center;min-width:52px;line-height:1.05}
+.score b{font-family:var(--f-display);font-weight:400;font-size:24px}
+.score span{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.opps{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;font-size:12px}
+.opps::-webkit-scrollbar{display:none}
+.opp{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;padding:2px 8px;border:1px solid var(--line);border-radius:999px;font-weight:700}
+.loadbar{position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,transparent,var(--link),transparent);background-size:50% 100%;background-repeat:no-repeat;animation:slide 1s linear infinite}
+@keyframes slide{from{background-position:-50% 0}to{background-position:150% 0}}
+@media (prefers-reduced-motion: reduce){.loadbar{animation:none;background:var(--link)}}
+
+.findbar{position:fixed;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom,0px));z-index:41;background:var(--card);border-top:1px solid var(--line)}
+.findbar .in{max-width:720px;margin:0 auto;display:flex;gap:6px;align-items:center;padding:8px max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px))}
+body.finding{padding-bottom:calc(var(--bar) + env(safe-area-inset-bottom,0px) + 50vh)}
+.findbar input{flex:1;min-width:0;min-height:44px}
+.linklist{max-height:min(50vh,420px);overflow-y:auto;-webkit-overflow-scrolling:touch;border-bottom:1px solid var(--line)}
+.lrow{max-width:720px;margin:0 auto;display:flex;align-items:stretch;border-bottom:1px solid var(--line);padding-left:max(4px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.lrow:last-child{border-bottom:0}
+.lrow.tgt{background:color-mix(in srgb,var(--flag) 30%,transparent)}
+.lname{flex:1;min-width:0;border:0;background:none;text-align:left;padding:10px 8px;display:flex;flex-direction:column;gap:1px;min-height:48px;justify-content:center}
+.lname b{overflow-wrap:anywhere}
+.lname span{font-size:12px;color:var(--muted)}
+.lgo{align-self:center;display:inline-flex;align-items:center;gap:2px;border:1px solid var(--link);color:var(--link);background:none;border-radius:999px;padding:0 6px 0 12px;min-height:38px;font-weight:700;font-size:14px}
+.lgo .ico{width:18px;height:18px}
+.lmore{padding:12px 16px;text-align:center}
+.bar button.findbtn span{display:grid;place-items:center;width:44px;height:28px;border-radius:999px;background:var(--flag);color:var(--flag-ink)}
+.bar button.findbtn.on span{background:var(--ink);color:var(--paper)}
+.article a.flash{background:var(--hit-cur);color:#000;border-radius:3px;outline:3px solid var(--hit-cur)}
+.findbar .cnt{font-size:13px;color:var(--muted);min-width:48px;text-align:center}
+.findbar .iconbtn{width:44px;height:44px}
+
+/* ---------- article ---------- */
+.article{max-width:720px;margin:0 auto;padding:6px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));font-family:var(--f-read);font-size:18px;line-height:1.62;overflow-wrap:break-word}
+.article.loading{opacity:.45;pointer-events:none}
+.article h1.title{font-family:var(--f-display);font-weight:400;font-size:30px;line-height:1.15;margin:14px 0 4px;text-wrap:balance}
+.article .crumb{font-family:var(--f-ui);font-size:13px;color:var(--muted);margin-bottom:12px}
+.article h2{font-family:var(--f-display);font-weight:400;font-size:24px;line-height:1.2;margin:28px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.article h3,.article h4{font-family:var(--f-ui);font-size:18px;margin:20px 0 6px}
+.article p{margin:0 0 14px}
+.article a{color:var(--link);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--link) 35%,transparent)}
+.article a.go{padding:1px 0}
+.article a.go:active{background:color-mix(in srgb,var(--link) 18%,transparent)}
+.article a.go.isTarget{background:var(--flag);color:var(--flag-ink);border-radius:3px;padding:0 3px;border:0}
+.article .dead{color:inherit}
+.article img{max-width:100%;height:auto;background:var(--imgbg)}
+.article figure,.article .thumb{margin:12px 0;max-width:100%}
+.article figcaption,.article .thumbcaption{font-family:var(--f-ui);font-size:13px;color:var(--muted);line-height:1.4}
+.article .tw{overflow-x:auto;margin:12px 0;-webkit-overflow-scrolling:touch}
+.article table{border-collapse:collapse;font-family:var(--f-ui);font-size:14px;line-height:1.4;max-width:none}
+.article table,.article th,.article td{background:transparent!important;color:inherit!important;border-color:var(--line)!important}
+.article th,.article td{border:1px solid var(--line);padding:5px 7px;vertical-align:top}
+.article table.infobox{width:100%!important;float:none!important;margin:0!important;border:1px solid var(--line)}
+.article .infobox th{text-align:left}
+.article .infobox-above,.article .infobox-title{font-family:var(--f-display);font-size:18px;font-weight:400}
+.article ul,.article ol{padding-left:22px;margin:0 0 14px}
+.article li{margin-bottom:4px}
+.article blockquote{margin:12px 0;padding-left:14px;border-left:3px solid var(--line)}
+.article .hatnote{font-style:italic;font-size:15px;color:var(--muted);margin-bottom:10px}
+.article sup,.article sub{line-height:0}
+.article *{max-width:100%}
+.article .tw table{max-width:none}
+.article [style*="float"]{float:none!important}
+.article .mw-collapsible-content,.article .collapsed{display:revert}
+
+/* ---------- finish ---------- */
+.finish{padding-block:24px;display:flex;flex-direction:column;gap:16px}
+.finish .big{font-family:var(--f-display);font-size:40px;line-height:1.05;margin:0;text-wrap:balance}
+.finish .big em{font-style:normal;background:var(--flag);color:var(--flag-ink);padding:0 8px;border-radius:8px}
+.flagstrip{height:14px;border-radius:4px;background:repeating-conic-gradient(var(--ink) 0 25%,var(--paper) 0 50%) 0 0/14px 14px;border:1px solid var(--ink)}
+.rules{font-size:15px;color:var(--muted);margin:0;padding-left:18px}
+.rules li{margin-bottom:4px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="layer"></div>
+
+<script>
+/* ===== config: filled in at deploy time ===== */
+const SB_URL = "https://brhxrmoulfkxonfavgwc.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJyaHhybW91bGZreG9uZmF2Z3djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjU1NzUsImV4cCI6MjEwODEwMTU3NX0.t3C9Jt3Cvs57A4EKLz_UpVYmu3POSLzoz67UBPtAw-o";
+const WIKI = "https://en.wikipedia.org";
+
+/* ===== tiny helpers ===== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm = t => String(t || "").replace(/_/g, " ").trim().replace(/^./, c => c.toUpperCase());
+const sameTitle = (a, b) => norm(a) === norm(b);
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} }
+};
+const ICONS = {
+  flag:'<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
+  trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  route:'<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/>',
+  up:'<path d="M18 15l-6-6-6 6"/>',
+  down:'<path d="M6 9l6 6 6-6"/>',
+  x:'<path d="M18 6L6 18M6 6l12 12"/>',
+  dice:'<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  share:'<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4M12 2v14"/>',
+  home:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+  top:'<path d="M5 4h14"/><path d="M12 20V8M7 13l5-5 5 5"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'
+};
+const ico = n => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
+const COLORS = ["#2f6fe4","#e0457b","#16a06a","#d9822b","#8b5cf6","#0ea5b7","#c2410c","#64748b"];
+function fmtTime(ms){
+  if (ms == null || ms < 0) return "–";
+  const s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+  return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+function ago(iso){
+  const d = (Date.now() - new Date(iso)) / 1000;
+  if (d < 60) return "just now";
+  if (d < 3600) return `${Math.floor(d/60)} min ago`;
+  if (d < 86400) return `${Math.floor(d/3600)} h ago`;
+  return new Date(iso).toLocaleDateString(undefined, {month:"short", day:"numeric"});
+}
+let toastT;
+function toast(msg){
+  let el = $(".toast");
+  if (!el){ el = document.createElement("div"); el.className = "toast"; el.setAttribute("role","status"); document.body.append(el); }
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600);
+}
+
+/* ===== database (Supabase REST) ===== */
+async function sb(path, {method = "GET", body, prefer} = {}){
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method,
+    headers: {apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json",
+      Prefer: prefer || "return=representation"},
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const txt = await r.text();
+  if (!r.ok){
+    let msg = txt; try { msg = JSON.parse(txt).message || txt; } catch {}
+    const e = new Error(msg); e.status = r.status; e.raw = txt; throw e;
+  }
+  return txt ? JSON.parse(txt) : null;
+}
+
+/* ===== Wikipedia ===== */
+const wq = params => fetch(`${WIKI}/w/api.php?` + new URLSearchParams({format:"json", formatversion:"2", origin:"*", ...params})).then(r => r.json());
+const BAD_NS = /^(File|Image|Media|Help|Special|Category|Wikipedia|WP|Portal|Template|Talk|User|Draft|Module|MediaWiki|Book|TimedText|Wiktionary|Wikt|Wikisource|Commons|Meta|Species|Wikiquote|Wikibooks|Wikinews|Wikiversity|Wikivoyage|Wikidata|D|Q|S|N|V|B|C|M|Mw|Foundation|Wmf|Outreach|Gerrit|Phab|Phabricator|Bugzilla|Iarchive|Doi|Arxiv|ISSN|ISBN)( talk)?:/i;
+const pageCache = new Map();
+
+async function fetchArticle(title){
+  if (pageCache.has(norm(title))) return pageCache.get(norm(title));
+  const j = await wq({action:"parse", page:title, redirects:"1", prop:"text", disableeditsection:"1", disabletoc:"1"});
+  if (j.error) throw new Error(j.error.info || "Page not found");
+  const out = {title: j.parse.title, html: j.parse.text};
+  pageCache.set(norm(title), out); pageCache.set(norm(out.title), out);
+  return out;
+}
+async function resolveTitles(titles){
+  const j = await wq({action:"query", titles:titles.join("|"), redirects:"1", prop:"pageprops", ppprop:"disambiguation"});
+  const map = {};
+  (j.query?.normalized || []).forEach(n => map[n.from] = n.to);
+  (j.query?.redirects || []).forEach(r => map[r.from] = r.to);
+  const pages = Object.fromEntries((j.query?.pages || []).map(p => [p.title, p]));
+  return titles.map(t => {
+    let x = t; for (let i = 0; i < 3 && map[x]; i++) x = map[x];
+    const p = pages[x];
+    return p && !p.missing && !p.invalid ? {title: p.title, disambig: !!p.pageprops} : null;
+  });
+}
+async function randomTitle(){
+  for (let tries = 0; tries < 6; tries++){
+    const j = await wq({action:"query", generator:"random", grnnamespace:"0", grnlimit:"40", prop:"info|pageprops", ppprop:"disambiguation"});
+    const good = (j.query?.pages || []).filter(p => !p.pageprops && p.length > 18000 && !/^List of/i.test(p.title));
+    if (good.length) return good.sort((a, b) => b.length - a.length)[0].title;
+  }
+  throw new Error("Could not find a random page, try again");
+}
+async function suggest(q){
+  if (!q.trim()) return [];
+  const j = await fetch(`${WIKI}/w/api.php?` + new URLSearchParams({action:"opensearch", search:q, limit:"6", namespace:"0", format:"json", origin:"*"})).then(r => r.json());
+  return j[1] || [];
+}
+async function summary(title){
+  const r = await fetch(`${WIKI}/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, "_"))}`);
+  if (!r.ok) throw new Error("No summary");
+  return r.json();
+}
+
+/* clean Wikipedia HTML for phones and turn article links into game moves */
+function prepareArticle(html, target){
+  const doc = new DOMParser().parseFromString(`<div id="root">${html}</div>`, "text/html");
+  const root = doc.getElementById("root");
+  root.querySelectorAll([
+    "script","style","link","meta","iframe","object","embed","noscript",
+    ".mw-editsection",".reference",".mw-references-wrap",".reflist","ol.references",
+    ".navbox",".navbox-styles",".vertical-navbox",".sistersitebox",".side-box",".metadata",".ambox",".ombox",".tmbox",".mbox-small",
+    ".noprint:not(.hatnote)","#coordinates",".mw-empty-elt",".portalbox",".authority-control",".shortdescription",".mw-authority-control"
+  ].join(",")).forEach(n => n.remove());
+  // drop now-empty reference sections
+  root.querySelectorAll(".mw-heading2, h2").forEach(h => {
+    const t = (h.textContent || "").trim().toLowerCase();
+    if (/^(references|notes|citations|sources|footnotes|bibliography)$/.test(t)){
+      const wrapH = h.closest(".mw-heading") || h;
+      let n = wrapH.nextElementSibling;
+      while (n && !(n.matches(".mw-heading2, h2"))){ const nx = n.nextElementSibling; n.remove(); n = nx; }
+      wrapH.remove();
+    }
+  });
+  root.querySelectorAll("img").forEach(img => {
+    ["src","srcset"].forEach(a => { const v = img.getAttribute(a); if (v) img.setAttribute(a, v.replace(/(^|\s|,)\/\//g, "$1https://")); });
+    img.loading = "lazy"; img.decoding = "async";
+    const w = +img.getAttribute("width"); if (w && w < 40) img.style.background = "transparent";
+  });
+  root.querySelectorAll("[style]").forEach(el => {
+    const s = el.getAttribute("style");
+    el.setAttribute("style", s.replace(/(^|;)\s*(width|min-width|float|margin-left|margin-right)\s*:[^;]*/gi, "$1"));
+  });
+  root.querySelectorAll("table").forEach(t => {
+    if (t.parentElement?.classList.contains("tw")) return;
+    const w = doc.createElement("div"); w.className = "tw"; t.replaceWith(w); w.append(t);
+  });
+  root.querySelectorAll("a").forEach(a => {
+    const href = a.getAttribute("href") || "";
+    if (href.startsWith("#")) return;
+    let title = null;
+    if (href.startsWith("/wiki/")){
+      title = decodeURIComponent(href.slice(6).split("#")[0]).replace(/_/g, " ");
+      if (!title || BAD_NS.test(title)) title = null;
+    }
+    if (a.classList.contains("new")) title = null;
+    if (title){
+      a.className = "go"; a.dataset.t = title; a.setAttribute("href", "#");
+      a.removeAttribute("title");
+      if (target && sameTitle(title, target)) a.classList.add("isTarget");
+    } else {
+      const s = doc.createElement("span"); s.className = "dead"; s.innerHTML = a.innerHTML; a.replaceWith(s);
+    }
+  });
+  return root.innerHTML;
+}
+
+/* ===== app state ===== */
+const S = {
+  me: store.get("wr_me"),
+  players: [], rounds: [], runs: [],
+  tab: store.get("wr_tab") || "race",
+  view: "boot",          // boot | gate | home | race | finish | setup
+  race: null,            // {round, run, page, busy, err}
+  find: {open:false},
+  loaded: false
+};
+const player = id => S.players.find(p => p.id === id);
+const pname = id => player(id)?.name || "Someone";
+const pcolor = id => player(id)?.color || "#888";
+const runsOf = rid => S.runs.filter(r => r.round_id === rid);
+const myRun = rid => S.runs.find(r => r.round_id === rid && r.player_id === S.me);
+const dur = r => r.finished_at ? new Date(r.finished_at) - new Date(r.started_at) : null;
+
+function standings(rid){
+  const rs = runsOf(rid);
+  const fin = rs.filter(r => r.status === "finished").sort((a, b) => a.clicks - b.clicks || dur(a) - dur(b));
+  const winner = fin[0] || null;
+  return {rs, fin, winner};
+}
+const revealed = rid => { const m = myRun(rid); return m && m.status !== "playing"; };
+
+async function loadAll(){
+  const [players, rounds, runs] = await Promise.all([
+    sb("players?select=*&order=created_at.asc"),
+    sb("rounds?select=*&order=created_at.desc&limit=300"),
+    sb("runs?select=*&order=started_at.asc&limit=5000")
+  ]);
+  S.players = players; S.rounds = rounds; S.runs = runs; S.loaded = true;
+}
+
+/* ===== rendering ===== */
+const app = $("#app"), layer = $("#layer");
+
+function render(){
+  if (S.view === "setup") return renderSetup();
+  if (S.view === "boot") { app.innerHTML = `<div class="wrap"><div class="gate"><h1 class="logo">Wiki<span>race</span></h1><p class="muted">Loading…</p></div></div>`; return; }
+  if (S.view === "gate") return renderGate();
+  if (S.view === "race") return renderRace();
+  if (S.view === "finish") return renderFinish();
+  renderHome();
+}
+
+function renderSetup(){
+  app.innerHTML = `<div class="wrap"><div class="gate"><h1 class="logo">Wiki<span>race</span></h1><p class="err">The game's database isn't connected yet.</p></div></div>`;
+}
+
+function renderGate(err){
+  const others = S.players;
+  app.innerHTML = `<div class="wrap"><div class="gate">
+    <h1 class="logo">Wiki<span>race</span></h1>
+    <p>Get from one Wikipedia page to another using only the links inside the articles. Fewest clicks wins.</p>
+    ${others.length ? `<div class="stack"><div class="label">Who's playing?</div><div class="who-list">
+      ${others.map(p => `<button class="chipbtn" data-pick="${p.id}"><span class="dot" style="background:${esc(p.color)}"></span><span class="nm">${esc(p.name)}</span></button>`).join("")}
+    </div></div>` : ""}
+    <form id="newp" class="stack">
+      <label class="label" for="pn">${others.length ? "Or join as someone new" : "Your name"}</label>
+      <div class="inrow"><input id="pn" class="txt" maxlength="24" autocomplete="nickname" placeholder="e.g. Kartik" required>
+      <button class="btn primary" type="submit">Join</button></div>
+      ${err ? `<div class="err">${esc(err)}</div>` : ""}
+    </form>
+  </div></div>`;
+  app.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => setMe(b.dataset.pick));
+  $("#newp").onsubmit = async e => {
+    e.preventDefault();
+    const name = $("#pn").value.trim().slice(0, 24);
+    if (!name) return;
+    const existing = S.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existing) return setMe(existing.id);
+    try {
+      const [p] = await sb("players", {method:"POST", body:{name, color: COLORS[S.players.length % COLORS.length]}});
+      S.players.push(p); setMe(p.id);
+    } catch (e2) { renderGate(e2.status === 409 ? "That name is taken. Pick it from the list above." : "Couldn't save your name. Check your connection and try again."); }
+  };
+}
+function setMe(id){ S.me = id; store.set("wr_me", id); S.view = "home"; render(); }
+
+function renderHome(){
+  const me = player(S.me);
+  app.innerHTML = `
+  <div class="wrap">
+    <div class="top">
+      <h1 class="logo">Wiki<span>race</span></h1>
+      <div class="me">
+        <button class="chipbtn" id="invite" aria-label="Copy invite link">${ico("share")}<span class="nm">Invite</span></button>
+        <button class="chipbtn" id="switch" title="Switch player"><span class="dot" style="background:${esc(me?.color)}"></span><span class="nm">${esc(me?.name)}</span></button>
+      </div>
+    </div>
+    <div id="tabbody">${S.tab === "board" ? homeBoard() : S.tab === "history" ? homeHistory() : homeRace()}</div>
+  </div>
+  <nav class="bar" aria-label="Sections"><div class="in">
+    <button data-tab="race" aria-current="${S.tab === "race"}">${ico("flag")}Race</button>
+    <button data-tab="board" aria-current="${S.tab === "board"}">${ico("trophy")}Leaderboard</button>
+    <button data-tab="history" aria-current="${S.tab === "history"}">${ico("list")}History</button>
+  </div></nav>`;
+  app.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; store.set("wr_tab", S.tab); window.scrollTo(0, 0); renderHome(); });
+  $("#switch").onclick = () => { S.view = "gate"; render(); };
+  $("#invite").onclick = async () => {
+    const url = location.origin + location.pathname;
+    try { await navigator.clipboard.writeText(url); toast("Link copied. Send it to your friend."); }
+    catch { toast(url); }
+  };
+  app.querySelectorAll("[data-play]").forEach(b => b.onclick = () => startRun(b.dataset.play));
+  app.querySelectorAll("[data-peek]").forEach(b => b.onclick = () => openTargetSheet(b.dataset.peek));
+  const nr = $("#newround"); if (nr) nr.onclick = openNewRound;
+}
+
+function racerRows(round, {showTrail}){
+  const {rs, winner} = standings(round.id);
+  if (!rs.length) return `<div class="meta">No one has raced this yet.</div>`;
+  const reveal = showTrail && revealed(round.id);
+  return `<div class="racers">${rs.slice().sort((a, b) => rank(a) - rank(b)).map(r => {
+    const st = r.status === "finished"
+      ? (winner && winner.id === r.id && rs.length > 1 ? `<span class="pill won">${ico("trophy").replace('class="ico"','class="ico" style="width:12px;height:12px"')}Won</span>` : `<span class="pill done">Finished</span>`)
+      : r.status === "gave_up" ? `<span class="pill quit">Gave up</span>` : `<span class="pill live">Racing</span>`;
+    const trail = showTrail ? (reveal || r.player_id === S.me ? trailHTML(r.path, round.target_title)
+      : `<div class="hiddentrail">Trail hidden until you finish this round.</div>`) : "";
+    return `<div class="stack" style="gap:6px"><div class="racer"><span class="dot" style="background:${esc(pcolor(r.player_id))}"></span>
+      <span class="nm">${esc(pname(r.player_id))}${r.player_id === S.me ? " (you)" : ""}</span><span class="sp"></span>
+      <span class="num meta">${r.clicks} click${r.clicks === 1 ? "" : "s"}${r.finished_at ? " · " + fmtTime(dur(r)) : ""}</span>${st}</div>${trail}</div>`;
+  }).join("")}</div>`;
+  function rank(r){ return r.status === "finished" ? r.clicks * 1e9 + (dur(r) || 0) / 1000 : r.status === "playing" ? 1e15 : 2e15; }
+}
+function trailHTML(path, target){
+  const p = path || [];
+  return `<div class="trail">${p.map((t, i) => {
+    const isBack = i > 1 && p[i - 2] === t;
+    const cls = sameTitle(t, target) && i === p.length - 1 ? "st end" : isBack ? "st back" : "st";
+    return `${i ? '<span class="sep">›</span>' : ""}<span class="${cls}">${esc(t)}</span>`;
+  }).join("")}</div>`;
+}
+function routeHTML(round){
+  return `<div class="route"><div class="pg"><small>Start</small>${esc(round.start_title)}</div><div class="arrow">${ico("route")}</div>
+    <div class="pg to"><small>Target</small>${esc(round.target_title)}</div></div>`;
+}
+function actionBtn(round){
+  const m = myRun(round.id);
+  if (!m) {
+    const {winner} = standings(round.id);
+    return `<button class="btn flag block" data-play="${round.id}">${ico("flag")}${winner ? `Race it · beat ${winner.clicks}` : "Start racing"}</button>`;
+  }
+  if (m.status === "playing") return `<button class="btn primary block" data-play="${round.id}">Continue your race · ${m.clicks} clicks so far</button>`;
+  return "";
+}
+
+function homeRace(){
+  const rounds = S.rounds.slice(0, 8);
+  const live = S.runs.filter(r => r.status === "playing" && r.player_id !== S.me);
+  return `
+    <button class="btn primary block" id="newround" style="margin-top:8px">${ico("plus")}New round</button>
+    ${live.length ? `<p class="meta" style="margin:10px 2px 0">${live.map(r => `<b>${esc(pname(r.player_id))}</b> is racing now (${r.clicks} clicks)`).join(" · ")}</p>` : ""}
+    <h2 class="sec">Rounds</h2>
+    <div class="stack">
+      ${rounds.length ? rounds.map(r => `<article class="round">
+        <div class="meta">${ago(r.created_at)} · set by ${esc(pname(r.created_by))}</div>
+        ${routeHTML(r)}
+        ${racerRows(r, {showTrail:false})}
+        ${actionBtn(r)}
+        <button class="btn block" data-peek="${esc(r.target_title)}">What is ${esc(r.target_title)}?</button>
+      </article>`).join("") : `<div class="empty">No rounds yet. Tap <b>New round</b> to pick a start and target page, then send the link to your friend.</div>`}
+    </div>
+    <h2 class="sec">How to play</h2>
+    <ul class="rules">
+      <li>Everyone in a round starts on the same page and races to the same target.</li>
+      <li>Only links inside the article count. Every tap on a link is one click, and so is Back.</li>
+      <li>Fewest clicks wins. Ties go to the faster time.</li>
+      <li>Tap <b>Find page</b> to search every link on the current article by name, then tap <b>Go</b> to follow it. The target is pinned to the top when it's linked.</li>
+      <li>Trails stay hidden until you finish or give up, so no peeking.</li>
+    </ul>`;
+}
+
+function playerStats(){
+  return S.players.map(p => {
+    const rs = S.runs.filter(r => r.player_id === p.id);
+    const fin = rs.filter(r => r.status === "finished");
+    let wins = 0;
+    S.rounds.forEach(rd => { const {rs: all, winner} = standings(rd.id); if (winner && all.length > 1 && winner.player_id === p.id) wins++; });
+    const avg = fin.length ? fin.reduce((a, r) => a + r.clicks, 0) / fin.length : null;
+    const best = fin.length ? Math.min(...fin.map(r => r.clicks)) : null;
+    const avgT = fin.length ? fin.reduce((a, r) => a + dur(r), 0) / fin.length : null;
+    const fastest = fin.length ? Math.min(...fin.map(dur)) : null;
+    return {p, races: rs.filter(r => r.status !== "playing").length, fin: fin.length, gave: rs.filter(r => r.status === "gave_up").length, wins, avg, best, avgT, fastest};
+  }).filter(s => s.races > 0 || s.p.id === S.me)
+    .sort((a, b) => b.wins - a.wins || (a.avg ?? 1e9) - (b.avg ?? 1e9));
+}
+function homeBoard(){
+  const st = playerStats();
+  const mine = st.find(s => s.p.id === S.me);
+  return `<h2 class="sec">Leaderboard</h2>
+  ${st.some(s => s.races) ? `<div class="tblwrap"><table class="lb">
+    <thead><tr><th>Player</th><th>Wins</th><th>Races</th><th>Avg clicks</th><th>Best</th></tr></thead>
+    <tbody>${st.map((s, i) => `<tr class="${i === 0 && s.wins ? "lead" : ""}"><td><div class="who"><span class="rank">${i + 1}</span><span class="dot" style="background:${esc(s.p.color)}"></span>${esc(s.p.name)}</div></td>
+      <td>${s.wins}</td><td>${s.races}</td><td>${s.avg == null ? "–" : s.avg.toFixed(1)}</td><td>${s.best ?? "–"}</td></tr>`).join("")}</tbody>
+  </table></div>
+  <p class="meta">A win is the fewest clicks in a round with 2 or more racers. Ties go to the faster time.</p>` : `<div class="empty">Finish a race and your stats show up here.</div>`}
+  ${mine ? `<h2 class="sec">Your stats</h2><div class="stats">
+    <div class="stat"><span class="label">Finished</span><b class="num">${mine.fin} of ${mine.races}</b></div>
+    <div class="stat"><span class="label">Gave up</span><b class="num">${mine.gave}</b></div>
+    <div class="stat"><span class="label">Avg time</span><b class="num">${fmtTime(mine.avgT)}</b></div>
+    <div class="stat"><span class="label">Fastest</span><b class="num">${fmtTime(mine.fastest)}</b></div>
+  </div>` : ""}`;
+}
+function homeHistory(){
+  const rounds = S.rounds.filter(r => runsOf(r.id).length);
+  return `<h2 class="sec">History</h2>
+  <div class="stack">${rounds.length ? rounds.map(r => `<article class="round">
+    <div class="meta">${new Date(r.created_at).toLocaleString(undefined, {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</div>
+    ${routeHTML(r)}
+    ${racerRows(r, {showTrail:true})}
+    ${actionBtn(r)}
+  </article>`).join("") : `<div class="empty">Every finished round lands here with each player's full trail of pages.</div>`}</div>`;
+}
+
+/* ===== sheets ===== */
+function sheet(html, onMount){
+  layer.innerHTML = `<div class="scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  const scrim = layer.firstElementChild;
+  scrim.addEventListener("click", e => { if (e.target === scrim) closeSheet(); });
+  scrim.querySelectorAll("[data-close]").forEach(b => b.onclick = closeSheet);
+  onMount?.(scrim.firstElementChild);
+}
+function closeSheet(){ layer.innerHTML = ""; }
+
+async function openTargetSheet(title){
+  sheet(`<div class="sheethead"><h3>${esc(title)}</h3><button class="x" data-close aria-label="Close">${ico("x")}</button></div><div id="sumbody" class="meta">Loading summary…</div>`);
+  try {
+    const s = await summary(title);
+    const b = $("#sumbody"); if (!b) return;
+    b.className = "preview";
+    b.innerHTML = `${s.thumbnail ? `<img src="${esc(s.thumbnail.source)}" alt="">` : ""}<div class="stack" style="gap:6px">${s.description ? `<div class="label">${esc(s.description)}</div>` : ""}<p>${esc(s.extract)}</p></div>`;
+  } catch { const b = $("#sumbody"); if (b) b.textContent = "Couldn't load a summary for this page."; }
+}
+
+function openNewRound(){
+  sheet(`<div class="sheethead"><h3>New round</h3><button class="x" data-close aria-label="Close">${ico("x")}</button></div>
+    <p class="meta" style="margin:0">Type a page or roll the dice for a random one. Everyone races the same pair.</p>
+    ${["start","target"].map(k => `<div class="field">
+      <label class="label" for="f_${k}">${k === "start" ? "Start page" : "Target page"}</label>
+      <div class="inrow"><input id="f_${k}" class="txt" autocomplete="off" autocapitalize="sentences" placeholder="${k === "start" ? "Random page…" : "Random page…"}">
+      <button class="iconbtn" type="button" data-roll="${k}" aria-label="Random ${k} page">${ico("dice")}</button></div>
+      <div class="sugg" id="s_${k}" hidden></div></div>`).join("")}
+    <div id="nrerr" class="err" hidden></div>
+    <button class="btn flag block" id="createRound">${ico("flag")}Create round and start</button>`, el => {
+    ["start","target"].forEach(k => {
+      const inp = $("#f_" + k), box = $("#s_" + k);
+      let t;
+      inp.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(async () => {
+          const list = await suggest(inp.value).catch(() => []);
+          if (document.activeElement !== inp) return;
+          box.hidden = !list.length;
+          box.innerHTML = list.map(x => `<button type="button">${esc(x)}</button>`).join("");
+          box.querySelectorAll("button").forEach(b => b.onclick = () => { inp.value = b.textContent; box.hidden = true; });
+        }, 200);
+      });
+      inp.addEventListener("blur", () => setTimeout(() => box.hidden = true, 200));
+    });
+    el.querySelectorAll("[data-roll]").forEach(b => b.onclick = () => roll(b.dataset.roll));
+    $("#createRound").onclick = createRound;
+    roll("start"); roll("target");
+  });
+}
+async function roll(k){
+  const inp = $("#f_" + k); if (!inp) return;
+  inp.value = ""; inp.placeholder = "Rolling…";
+  try { const t = await randomTitle(); if (!inp.value) inp.value = t; }
+  catch { inp.placeholder = "Couldn't reach Wikipedia"; }
+}
+async function createRound(){
+  const btn = $("#createRound"), errEl = $("#nrerr");
+  const a = $("#f_start").value.trim(), b = $("#f_target").value.trim();
+  errEl.hidden = true;
+  if (!a || !b){ errEl.textContent = "Pick both a start page and a target page."; errEl.hidden = false; return; }
+  btn.disabled = true; btn.textContent = "Checking pages…";
+  try {
+    const [ra, rb] = await resolveTitles([a, b]);
+    if (!ra || !rb) throw new Error(`Wikipedia has no page called "${!ra ? a : b}". Pick from the suggestions.`);
+    if (ra.disambig || rb.disambig) throw new Error(`"${ra.disambig ? ra.title : rb.title}" is a disambiguation page. Pick a more specific one.`);
+    if (sameTitle(ra.title, rb.title)) throw new Error("Start and target are the same page.");
+    const [round] = await sb("rounds", {method:"POST", body:{start_title: ra.title, target_title: rb.title, created_by: S.me}});
+    S.rounds.unshift(round);
+    closeSheet();
+    startRun(round.id);
+  } catch (e){
+    errEl.textContent = e.message || "Couldn't create the round."; errEl.hidden = false;
+    btn.disabled = false; btn.innerHTML = `${ico("flag")}Create round and start`;
+  }
+}
+
+/* ===== racing ===== */
+async function startRun(rid){
+  const round = S.rounds.find(r => r.id === rid);
+  if (!round) return;
+  let run = myRun(rid);
+  if (!run){
+    try {
+      [run] = await sb("runs", {method:"POST", body:{round_id: rid, player_id: S.me, path:[round.start_title], clicks:0, status:"playing"}});
+      S.runs.push(run);
+    } catch (e){
+      await loadAll().catch(() => {});
+      run = myRun(rid);
+      if (!run){ toast("Couldn't start the race. Try again."); return; }
+    }
+  }
+  if (run.status !== "playing"){ S.race = {round, run}; S.view = "finish"; render(); return; }
+  S.race = {round, run, page:null, busy:false, err:null};
+  S.find = {open:false};
+  S.view = "race";
+  render();
+  loadPage(run.path[run.path.length - 1], {record:false});
+}
+
+function renderRace(){
+  const {round, run} = S.race;
+  app.innerHTML = `
+  <header class="raceHead"><div class="in">
+    <div class="rh1">
+      <button class="x" id="leave" aria-label="Back to lobby">${ico("home")}</button>
+      <button class="target" id="tgt"><div><small>Get to</small><div class="t">${esc(round.target_title)}</div></div></button>
+      <div class="score"><b class="num" id="clk">${run.clicks}</b><span>clicks</span></div>
+      <div class="score"><b class="num" id="tmr" style="font-size:18px">0:00</b><span>time</span></div>
+    </div>
+    <div class="opps" id="opps"></div>
+  </div><div class="loadbar" id="lb" hidden></div></header>
+  <main class="article" id="art"></main>
+  <div class="findbar" id="fb" hidden>
+    <div class="linklist" id="fl"></div>
+    <div class="in">
+      <input id="fq" class="txt" type="search" enterkeyhint="go" placeholder="Find a linked page" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <span class="cnt num" id="fc"></span>
+      <button class="iconbtn" id="fx" aria-label="Close find">${ico("x")}</button>
+    </div>
+  </div>
+  <nav class="bar" aria-label="Race tools"><div class="in">
+    <button id="bBack">${ico("back")}Back</button>
+    <button id="bFind" class="findbtn"><span>${ico("search")}</span>Find page</button>
+    <button id="bTrail">${ico("route")}Trail</button>
+    <button id="bTop">${ico("top")}Top</button>
+  </div></nav>`;
+  $("#leave").onclick = () => { stopRaceTimers(); S.view = "home"; S.race = null; render(); refresh(); };
+  $("#tgt").onclick = () => openTargetSheet(round.target_title);
+  $("#bBack").onclick = goBack;
+  $("#bFind").onclick = () => S.find.open ? closeFind() : openFind();
+  $("#bTrail").onclick = openTrailSheet;
+  $("#bTop").onclick = () => window.scrollTo({top:0, behavior:"smooth"});
+  $("#art").addEventListener("click", onArticleClick);
+  wireFind();
+  renderOpps(); renderArticle(); startRaceTimers();
+}
+function renderArticle(){
+  const art = $("#art"); if (!art) return;
+  const {page, err, run} = S.race;
+  $("#bBack").disabled = run.path.length < 2;
+  if (err){ art.innerHTML = `<p class="err" style="margin-top:24px">${esc(err)}</p><button class="btn" id="retry">Try again</button>`; $("#retry").onclick = () => loadPage(run.path[run.path.length - 1], {record:false}); return; }
+  if (!page){ art.innerHTML = `<p class="muted" style="margin-top:24px">Loading the page…</p>`; return; }
+  art.innerHTML = `<h1 class="title">${esc(page.title)}</h1><div class="crumb">Page ${run.path.length} of your trail</div>${page.html}`;
+}
+function renderOpps(){
+  const el = $("#opps"); if (!el || !S.race) return;
+  const others = runsOf(S.race.round.id).filter(r => r.player_id !== S.me);
+  el.innerHTML = others.length ? others.map(r => `<span class="opp"><span class="dot" style="background:${esc(pcolor(r.player_id))}"></span>${esc(pname(r.player_id))} · ${r.status === "finished" ? `done in ${r.clicks}` : r.status === "gave_up" ? "gave up" : `${r.clicks} clicks`}</span>`).join("")
+    : `<span class="meta">No one else in this round yet. Invite your friend from the lobby.</span>`;
+}
+
+function onArticleClick(e){
+  const a = e.target.closest("a"); if (!a) return;
+  const href = a.getAttribute("href") || "";
+  if (a.classList.contains("go")){ e.preventDefault(); loadPage(a.dataset.t, {record:true}); return; }
+  if (href.startsWith("#") && href.length > 1){
+    e.preventDefault();
+    const t = document.getElementById(decodeURIComponent(href.slice(1)));
+    t?.scrollIntoView({block:"start"});
+  }
+}
+
+async function loadPage(title, {record, isBack = false}){
+  const R = S.race; if (!R || R.busy) return;
+  R.busy = true; R.err = null;
+  $("#art")?.classList.add("loading"); const lb = $("#lb"); if (lb) lb.hidden = false;
+  try {
+    const raw = await fetchArticle(title);
+    if (S.race !== R) return;
+    R.page = {title: raw.title, html: prepareArticle(raw.html, R.round.target_title)};
+    if (record){
+      const path = [...R.run.path, raw.title];
+      const patch = {path, clicks: path.length - 1, updated_at: new Date().toISOString()};
+      const won = sameTitle(raw.title, R.round.target_title);
+      if (won){ patch.status = "finished"; patch.finished_at = new Date().toISOString(); }
+      Object.assign(R.run, patch);
+      syncRun(patch);
+      if (won){ finishRace(); return; }
+    }
+    closeFind();
+    renderArticle(); window.scrollTo(0, 0);
+    const c = $("#clk"); if (c) c.textContent = R.run.clicks;
+  } catch (e){
+    R.err = /fetch|network/i.test(e.message) ? "Couldn't reach Wikipedia. Check your connection." : e.message;
+    if (record) toast(R.err); else renderArticle();
+  } finally {
+    R.busy = false;
+    $("#art")?.classList.remove("loading"); const lb2 = $("#lb"); if (lb2) lb2.hidden = true;
+  }
+}
+function goBack(){
+  const R = S.race; if (!R || R.run.path.length < 2) return;
+  loadPage(R.run.path[R.run.path.length - 2], {record:true, isBack:true});
+}
+let syncChain = Promise.resolve();
+function syncRun(patch){
+  const id = S.race.run.id;
+  syncChain = syncChain.then(() => sb(`runs?id=eq.${id}`, {method:"PATCH", body:patch, prefer:"return=minimal"}))
+    .catch(() => toast("Couldn't save your last move. It will retry on the next one."));
+  const local = S.runs.find(r => r.id === id); if (local) Object.assign(local, patch);
+  return syncChain;
+}
+
+let raceTick, racePoll;
+function startRaceTimers(){
+  stopRaceTimers();
+  const tick = () => { const t = $("#tmr"); if (t && S.race) t.textContent = fmtTime(Date.now() - new Date(S.race.run.started_at)); };
+  tick(); raceTick = setInterval(tick, 1000);
+  racePoll = setInterval(async () => {
+    if (!S.race || document.hidden) return;
+    try {
+      const rs = await sb(`runs?round_id=eq.${S.race.round.id}&select=*`);
+      rs.forEach(r => { if (r.player_id === S.me) return; const i = S.runs.findIndex(x => x.id === r.id); i >= 0 ? S.runs[i] = r : S.runs.push(r); });
+      renderOpps();
+    } catch {}
+  }, 4000);
+}
+function stopRaceTimers(){ clearInterval(raceTick); clearInterval(racePoll); }
+
+function openTrailSheet(){
+  const R = S.race;
+  sheet(`<div class="sheethead"><h3>Your trail</h3><button class="x" data-close aria-label="Close">${ico("x")}</button></div>
+    ${trailHTML(R.run.path, R.round.target_title)}
+    <p class="meta" style="margin:0">${R.run.clicks} click${R.run.clicks === 1 ? "" : "s"} so far. Opponents' trails unlock when you finish or give up.</p>
+    <button class="btn danger block" id="giveup">Give up this round</button>`, () => {
+    let armed = false;
+    $("#giveup").onclick = async () => {
+      if (!armed){ armed = true; $("#giveup").textContent = "Tap again to give up"; return; }
+      const patch = {status:"gave_up", finished_at:new Date().toISOString(), updated_at:new Date().toISOString()};
+      Object.assign(R.run, patch);
+      await syncRun(patch);
+      closeSheet(); finishRace();
+    };
+  });
+}
+
+async function finishRace(){
+  stopRaceTimers(); closeFind();
+  S.view = "finish"; render();
+  await syncChain; await refresh(false);
+  if (S.view === "finish") render();
+}
+function renderFinish(){
+  const {round, run} = S.race;
+  const won = run.status === "finished";
+  const {rs, winner} = standings(round.id);
+  app.innerHTML = `<div class="wrap"><div class="finish">
+    <div class="flagstrip" aria-hidden="true"></div>
+    ${won ? `<h1 class="big">You reached <em>${esc(round.target_title)}</em> in ${run.clicks} click${run.clicks === 1 ? "" : "s"}.</h1>
+      <p class="meta" style="margin:0">Time ${fmtTime(dur(run))}${winner && rs.length > 1 ? (winner.id === run.id ? " · You're leading this round." : ` · ${esc(pname(winner.player_id))} leads with ${winner.clicks}.`) : ""}</p>`
+      : `<h1 class="big">You gave up on ${esc(round.target_title)}.</h1>`}
+    <div class="round">${routeHTML(round)}${racerRows(round, {showTrail:true})}</div>
+    <button class="btn primary block" id="lobby">Back to lobby</button>
+    <button class="btn block" id="again">${ico("plus")}New round</button>
+  </div></div>`;
+  $("#lobby").onclick = () => { S.view = "home"; S.tab = "race"; S.race = null; window.scrollTo(0, 0); render(); };
+  $("#again").onclick = () => { S.view = "home"; S.race = null; render(); openNewRound(); };
+}
+
+/* ===== find a linked page (phone-friendly Ctrl+F for links) =====
+   Lists the current article's links; type to filter, Go follows one, tapping the name scrolls to it. */
+function wireFind(){
+  const q = $("#fq");
+  let t;
+  q.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => runLinkFind(q.value), 120); });
+  q.addEventListener("keydown", e => {
+    if (e.key === "Enter"){ e.preventDefault(); $("#fl .go2")?.click(); }
+    if (e.key === "Escape") closeFind();
+  });
+  q.addEventListener("focus", () => { $("#fl").hidden = false; });
+  $("#fx").onclick = closeFind;
+  $("#fl").addEventListener("click", e => {
+    const show = e.target.closest("[data-show]"), go = e.target.closest("[data-go]");
+    if (go){ const t = go.dataset.go; closeFind(); loadPage(t, {record:true}); }
+    else if (show){ jumpToLink(show.dataset.show); }
+  });
+}
+function openFind(){
+  const fb = $("#fb"); if (!fb) return;
+  S.find.open = true; fb.hidden = false; $("#fl").hidden = false;
+  document.body.classList.add("finding"); $("#bFind")?.classList.add("on");
+  const q = $("#fq"); runLinkFind(q.value); q.focus(); q.select();
+}
+function closeFind(){
+  S.find.open = false; document.body.classList.remove("finding");
+  const fb = $("#fb"); if (fb){ fb.hidden = true; $("#fc").textContent = ""; }
+  $("#bFind")?.classList.remove("on");
+  document.querySelectorAll(".article a.flash").forEach(a => a.classList.remove("flash"));
+}
+function pageLinks(){
+  const seen = new Map();
+  document.querySelectorAll("#art a.go").forEach(a => {
+    const t = a.dataset.t;
+    if (!seen.has(t)) seen.set(t, {t, texts:new Set(), n:0});
+    const o = seen.get(t); o.n++; o.texts.add(a.textContent.trim());
+  });
+  return [...seen.values()];
+}
+function runLinkFind(q){
+  const box = $("#fl"); if (!box) return;
+  const needle = q.trim().toLowerCase();
+  const target = S.race.round.target_title;
+  let list = pageLinks();
+  const total = list.length;
+  if (needle) list = list.filter(o => o.t.toLowerCase().includes(needle) || [...o.texts].some(x => x.toLowerCase().includes(needle)));
+  // target first, then names that start with the query, then the rest in page order
+  list.sort((a, b) => (sameTitle(b.t, target) - sameTitle(a.t, target)) ||
+    (needle ? (b.t.toLowerCase().startsWith(needle) - a.t.toLowerCase().startsWith(needle)) : 0));
+  $("#fc").textContent = needle ? `${list.length}` : `${total}`;
+  const shown = list.slice(0, 80);
+  box.innerHTML = shown.length ? shown.map((o, i) => {
+    const alt = [...o.texts].find(x => x && !sameTitle(x, o.t));
+    return `<div class="lrow${sameTitle(o.t, target) ? " tgt" : ""}">
+      <button class="lname" data-show="${esc(o.t)}"><b>${esc(o.t)}</b>${alt ? `<span>as “${esc(alt)}”</span>` : ""}${o.n > 1 ? `<span>${o.n} links</span>` : ""}</button>
+      <button class="lgo${i === 0 ? " go2" : ""}" data-go="${esc(o.t)}" aria-label="Go to ${esc(o.t)}">Go ${ico("back").replace('class="ico"', 'class="ico" style="transform:rotate(180deg)"')}</button>
+    </div>`;
+  }).join("") + (list.length > shown.length ? `<div class="meta lmore">${list.length - shown.length} more. Type to narrow it down.</div>` : "")
+    : `<div class="meta lmore">${total ? "No links on this page match that." : "This page has no links to other articles."}</div>`;
+}
+function jumpToLink(t){
+  const links = [...document.querySelectorAll("#art a.go")].filter(a => a.dataset.t === t);
+  if (!links.length) return;
+  document.querySelectorAll(".article a.flash").forEach(a => a.classList.remove("flash"));
+  // repeated taps cycle through each place the link appears
+  S.find.linkIdx = S.find.linkT === t ? (S.find.linkIdx + 1) % links.length : 0; S.find.linkT = t;
+  const a = links[S.find.linkIdx];
+  a.classList.add("flash");
+  $("#fl").hidden = true;
+  document.activeElement?.blur();
+  a.scrollIntoView({block:"center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  toast(links.length > 1 ? `Showing ${S.find.linkIdx + 1} of ${links.length} spots this link appears` : "Tap the highlighted link to go there.");
+}
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && layer.innerHTML) closeSheet();
+});
+
+/* ===== live refresh of the lobby ===== */
+async function refresh(rerender = true){
+  try { await loadAll(); } catch { return; }
+  if (rerender && S.view === "home" && !layer.innerHTML) renderHome();
+}
+setInterval(() => { if (!document.hidden && S.view === "home") refresh(); }, 6000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.view === "home") refresh(); });
+
+/* ===== boot ===== */
+(async function boot(){
+  if (!SB_URL.startsWith("https:")){ S.view = "setup"; return render(); }
+  render();
+  try { await loadAll(); }
+  catch { app.innerHTML = `<div class="wrap"><div class="gate"><h1 class="logo">Wiki<span>race</span></h1><p class="err">Couldn't load the game. Check your connection and reload.</p></div></div>`; return; }
+  if (!player(S.me)){ S.me = null; S.view = "gate"; return render(); }
+  S.view = "home"; render();
+})();
+</script>
+</body>
+</html>
